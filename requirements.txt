@@ -1,0 +1,8 @@
+notebook
+tqdm
+setuptools_rust
+scapy[basic] --pre
+sklearn
+py7zr
+matplotlib
+seaborn
