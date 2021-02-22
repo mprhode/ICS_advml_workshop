@@ -36,7 +36,7 @@ def get_all_data():
         data_dir.mkdir()
     zipfilename = data_dir/"power3class.7z"
     if not(zipfilename.exists()):
-        download("http://www.ece.uah.edu/~thm0009/icsdatasets/3class.7z", zipfilename)
+        download("http://www.ece.uah.edu/~thm0009/icsdatasets/triple.7z", zipfilename)
     unzip(zipfilename, data_dir/"power3class")
 
 def get_training_data(balanced=True):
