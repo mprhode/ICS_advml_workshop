@@ -9,12 +9,15 @@ Unix instructions:
 
 1. Clone repo
 
-    ```git clone https://github.com/mprhode/ICS_advml_workshop.git
-    
-    cd ICS_advml_workshop```
+    ```
+    git clone https://github.com/mprhode/ICS_advml_workshop.git
+    cd ICS_advml_workshop
+    ```
 
 2. We recommend using a virtual environment for these workbooks
 
-   ```python3 -m venv myvirtualenv
-   
-   pip install -r requirements.txt```
+   ```
+   python3 -m venv myvenv
+   source myvenv/bin/activate
+   pip install -r requirements.txt
+   ```
