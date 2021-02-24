@@ -9,11 +9,8 @@ import py7zr
 import pandas as pd
 import numpy as np
 
-
-# todo finish this with namelist walk to find pcaps
-
 data_dir = Path("datasets")
-test_train_cutoff = 10
+test_train_cutoff = 13
 
 def download(url, outfile, dataset_number=1):
     response = requests.get(url, stream=True)
@@ -29,15 +26,18 @@ def download(url, outfile, dataset_number=1):
             f.write(chunk)
             downloaded += chunkSize
 
+
 def unzip(zipfilename, outfolder):
     archive = py7zr.SevenZipFile(zipfilename, mode='r')
     archive.extractall(path=outfolder)
     archive.close()
 
 def remove_infs(df):
-    df = df.replace([-np.inf, np.inf], np.nan).dropna()
+    #df = df.replace([-np.inf, np.inf], np.nan)
+    df = df.replace(np.inf, np.finfo("float32").max)
+    df = df.replace(np.inf, np.finfo("float32").min)
+    df = df.dropna()
     return df
-
 
 def get_all_data():
     if not data_dir.exists():
@@ -46,7 +46,6 @@ def get_all_data():
     if not(zipfilename.exists()):
         download("http://www.ece.uah.edu/~thm0009/icsdatasets/triple.7z", zipfilename)
     unzip(zipfilename, data_dir/"power3class")
-
 
 def __get_dataset(start_file, stop_file, nrows=None):
     if not(data_dir/"power3class").exists() or not(len(listdir(data_dir/"power3class")) == 15):

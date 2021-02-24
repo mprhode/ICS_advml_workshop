@@ -25,16 +25,12 @@ import py7zr
 # todo finish this with namelist walk to find pcaps
 
 from utils import get_all_data, get_training_data
-df = get_training_data()
-print(len(df.columns.values.tolist()) - 2)
-
-raise Exception
 
 data_dir = Path("datasets")
 data_files = {
-        1: {"filename": "capture1.pcap", "url": "https://github.com/tjcruz-dei/ICS_PCAPS/releases/download/MODBUSTCP%231/captures1_v2.zip", "sizeMB":639},
-        2: {"filename": "capture2.pcap", "url": "https://github.com/tjcruz-dei/ICS_PCAPS/releases/download/MODBUSTCP%231/captures2.zip", "sizeMB": 186},
-        3: {"filename": "capture3.pcap", "url": "https://github.com/tjcruz-dei/ICS_PCAPS/releases/download/MODBUSTCP%231/captures3.zip", "sizeMB": 214},
+        1: {"filename": "capture1_v2.zip", "url": "https://github.com/tjcruz-dei/ICS_PCAPS/releases/download/MODBUSTCP%231/captures1_v2.zip", "sizeMB":639},
+        2: {"filename": "capture2.zip", "url": "https://github.com/tjcruz-dei/ICS_PCAPS/releases/download/MODBUSTCP%231/captures2.zip", "sizeMB": 186},
+        3: {"filename": "capture3.zip", "url": "https://github.com/tjcruz-dei/ICS_PCAPS/releases/download/MODBUSTCP%231/captures3.zip", "sizeMB": 214},
 }
 
 def download(url, outfile, dataset_number=1):
@@ -50,6 +46,11 @@ def download(url, outfile, dataset_number=1):
                           desc="Dataset {}/3".format(dataset_number), leave=True):
             f.write(chunk)
             downloaded += chunkSize
+
+for dataset_number, values in data_files.items():
+    download(values["url"], values["filename"], dataset_number=dataset_number)
+
+raise Exception
 
 def unzip(zipfilename, outfolder):
     archive = py7zr.SevenZipFile(zipfilename, mode='r')

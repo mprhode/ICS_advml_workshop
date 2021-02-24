@@ -1,6 +1,6 @@
 from sklearn.metrics import mean_squared_error, confusion_matrix, f1_score, accuracy_score
 from sklearn.covariance import EllipticEnvelope
-from sklearn.ensemble import IsolationForest, RandomForestClassifier
+from sklearn.ensemble import IsolationForest, RandomForestClassifier, AdaBoostClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn import svm
@@ -211,6 +211,10 @@ class MLP(SupervisedModel):
         super(MLP, self).__init__(features, save_model_path=save_model_path)
         self.call_model = MLPClassifier()
 
+class AdaBoost(SupervisedModel):
+    def __init__(self, features, save_model_path=None):
+        super(AdaBoost, self).__init__(features, save_model_path=save_model_path)
+        self.call_model = AdaBoostClassifier()
 
 
 from utils import get_testing_data, get_training_data
@@ -219,24 +223,24 @@ import numpy as np
 train_data = get_training_data(nrows=None)
 contamination = train_data["malicious"].sum() / len(train_data)
 test_data = get_testing_data(nrows=None)
-print(contamination)
-for mc in [LOF, OneClassSVM, ISOF, RobustCovariance]:
-    try:
-        contamination = contamination if mc != LOF else 0.5
-        model = mc(["snort_log1", "snort_log2", "snort_log3", "snort_log4", 'R1-PA1:VH', 'R1-PM1:V', 'R1-PA2:VH',
-                    'R1-PM2:V', 'R1-PA3:VH', 'R1-PM3:V', 'R1-PA4:IH', 'R1-PM4:I',
-           'R1-PA5:IH', 'R1-PM5:I', 'R1-PA6:IH'], contamination=contamination)
-        model.train(train_data)
-        model.test(test_data)
-    except Exception as e:
-        print(mc, e)
+# print(contamination)
+# for mc in [LOF, ISOF, RobustCovariance, OneClassSVM]:
+#     try:
+#         contamination = contamination if mc != LOF else 0.5
+#         model = mc(["snort_log1", "snort_log2", "snort_log3", "snort_log4", 'R1-PA1:VH', 'R1-PM1:V', 'R1-PA2:VH',
+#                     'R1-PM2:V', 'R1-PA3:VH', 'R1-PM3:V', 'R1-PA4:IH', 'R1-PM4:I',
+#            'R1-PA5:IH', 'R1-PM5:I', 'R1-PA6:IH'], contamination=contamination)
+#         model.train(train_data)
+#         model.test(test_data)
+#     except Exception as e:
+#         print(mc, e)
 
-for mc in [XGBoost, RandomForest, SVM, MLP]:
+print(train_data.columns.values)
+
+for mc in [XGBoost, RandomForest, MLP, AdaBoost, SVM]:
+    print(mc)
     try:
-        print(mc)
-        model = mc(["snort_log1", "snort_log2", "snort_log3", "snort_log4", 'R1-PA1:VH', 'R1-PM1:V', 'R1-PA2:VH',
-                        'R1-PM2:V', 'R1-PA3:VH', 'R1-PM3:V', 'R1-PA4:IH', 'R1-PM4:I',
-                        'R1-PA5:IH', 'R1-PM5:I', 'R1-PA6:IH'])
+        model = mc(train_data.columns.values.tolist()[:-2])
         model.train(train_data)
         model.test(test_data)
 
