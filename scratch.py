@@ -24,7 +24,6 @@ import py7zr
 
 # todo finish this with namelist walk to find pcaps
 
-from utils import get_all_data, get_training_data
 
 data_dir = Path("datasets")
 data_files = {
@@ -32,6 +31,14 @@ data_files = {
         2: {"filename": "capture2.zip", "url": "https://github.com/tjcruz-dei/ICS_PCAPS/releases/download/MODBUSTCP%231/captures2.zip", "sizeMB": 186},
         3: {"filename": "capture3.zip", "url": "https://github.com/tjcruz-dei/ICS_PCAPS/releases/download/MODBUSTCP%231/captures3.zip", "sizeMB": 214},
 }
+
+def remove_infs(df):
+    #df = df.replace([-np.inf, np.inf], np.nan)
+    df = df.replace(np.inf, np.finfo("float32").max)
+    df = df.replace(np.inf, np.finfo("float32").min)
+    df = df.dropna()
+    return df
+
 
 def download(url, outfile, dataset_number=1):
     response = requests.get(url, stream=True)
@@ -47,10 +54,10 @@ def download(url, outfile, dataset_number=1):
             f.write(chunk)
             downloaded += chunkSize
 
-for dataset_number, values in data_files.items():
-    download(values["url"], values["filename"], dataset_number=dataset_number)
-
-raise Exception
+# for dataset_number, values in data_files.items():
+#     download(values["url"], values["filename"], dataset_number=dataset_number)
+#
+# raise Exception
 
 def unzip(zipfilename, outfolder):
     archive = py7zr.SevenZipFile(zipfilename, mode='r')
@@ -106,16 +113,12 @@ def pkt_as_dict(pkt, indent=3, lvl="",
                       label_lvl="",
                       first_call=True):
     # based on scapy show() method
-    # returns: dict of pkt attributes normally printed by show()
+    # returns: dict of pkt attributes normally printed by show() plus time
     if first_call is True:
         ret = {}
     else:
         ret = first_call
 
-    # ret = "%s%s %s %s \n" % (label_lvl,
-    #                        ct.punct("###["),
-    #                        ct.layer_name(self.name),
-    #                        ct.punct("]###"))
     for f in pkt.fields_desc:
         if isinstance(f, ConditionalField) and not f._evalcond(pkt):
             continue
@@ -146,29 +149,25 @@ def pkt_as_dict(pkt, indent=3, lvl="",
             first_call=ret
         )
 
+    ret["time"] = float(pkt.time)
     return ret
-
-from sklearn.ensemble import RandomForestClassifier
 
 
 def process_pcap(file_name):
     print('Opening {}...'.format(file_name))
-    count = 0
     df = []
-    #for pkt, (pkt_data, pkt_metadata,) in zip(PcapReader(file_name),RawPcapReader(file_name)):
-    for pkt in PcapReader(file_name):
+    for i, pkt in enumerate(PcapReader(file_name)):
         data = pkt_as_dict(pkt)
         data["bytes"] = str(pkt)
-
-        count += 1
+        data["packet_number"] = i + 1
         df.append(data)
     df = pd.DataFrame(df)
     df["attack_type"] = file_name.split("/")[-2]
     df["filename"] = file_name.split("/")[-1]
     df["capturename"] = file_name.split("/")[-3]
-    df.to_csv("datasets/{}".format("_".join(file_name.split("/")[1:])).replace("pcap", "csv"), index=False)
-    print('{} contains {} packets'.format(file_name, count))
-
+    df["time_delta"] = df["time"].diff()
+    df.to_csv(data_dir / "{}".format("_".join(file_name.split("/")[1:])).replace("pcap", "csv"), index=False)
+    print("done parsing {}".format(file))
 
 # for cap in os.listdir("datasets"):
 #     if "." in cap:
@@ -198,3 +197,36 @@ for i, c in enumerate(cap_names):
            df.append(pd.read_csv(os.path.join("datasets", file)))
     df = pd.concat(df)
     df.to_csv(c + ".csv", index=False)
+
+
+###### OLD VERSION
+# def get_all_data():
+#     if not data_dir.exists():
+#         data_dir.mkdir()
+#     zipfilename = data_dir/"power3class.7z"
+#     if not(zipfilename.exists()):
+#         download("http://www.ece.uah.edu/~thm0009/icsdatasets/triple.7z", zipfilename)
+#     unzip(zipfilename, data_dir/"power3class")
+#
+# def __get_dataset(start_file, stop_file, nrows=None):
+#     if not(data_dir/"power3class").exists() or not(len(listdir(data_dir/"power3class")) == 15):
+#         get_all_data()
+#     # training data = csv files 1 - 9
+#     dfs = []
+#
+#     for i in range(start_file, stop_file):
+#         dfs.append(remove_infs(
+#             pd.read_csv(data_dir/"power3class"/"data{}.csv".format(i), nrows=nrows)
+#         ))
+#
+#     df = pd.concat(dfs)
+#     df["malicious"] = df["marker"] == "Attack"
+#
+#     print(df["malicious"].value_counts())
+#     return df
+#
+# def get_training_data(nrows=None):
+#    return __get_dataset(1, test_train_cutoff, nrows=nrows)
+#
+# def get_testing_data(nrows=None):
+#    return __get_dataset(test_train_cutoff, 16, nrows=nrows)
