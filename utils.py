@@ -23,7 +23,6 @@ def get_all_data():
     if not labels["relevant_files_exists"].all():
         download_and_label_data(labels, data_dir)
 
-
 def __get_dataset(train=True):
     get_all_data()
     all_data = pd.read_csv(dataset_file)
@@ -34,7 +33,6 @@ def __get_dataset(train=True):
 
 def get_training_data():
     return __get_dataset(train=True)
-
 
 def get_testing_data():
     return __get_dataset(train=False)
