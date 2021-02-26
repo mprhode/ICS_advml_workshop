@@ -237,10 +237,12 @@ test_data = get_testing_data(nrows=None)
 
 print(train_data.columns.values)
 
+ignore = ["attack", "malicious", "time", "packet_id"]
+
 for mc in [XGBoost, RandomForest, MLP, AdaBoost, SVM]:
     print(mc)
     try:
-        model = mc(train_data.columns.values.tolist()[:-2])
+        model = mc([c for c in train_data.columns.values if not(c in ignore)])
         model.train(train_data)
         model.test(test_data)
 
