@@ -36,8 +36,8 @@ class Model():
 
 
     def balance_data(self, data):
-        ben_rows = data[~data["malicious"]].index
-        mal_rows = data[data["malicious"]].index
+        ben_rows = data[data["malicious"] == 0].index
+        mal_rows = data[data["malicious"] == 1].index
         max_class = max(len(ben_rows), len(mal_rows))
         ben_rows = ben_rows[:max_class]
         mal_rows = mal_rows[:max_class]
@@ -220,9 +220,9 @@ class AdaBoost(SupervisedModel):
 from utils import get_testing_data, get_training_data
 import numpy as np
 
-train_data = get_training_data(nrows=None)
+train_data = get_training_data(nrows=100).astype(float)
 contamination = train_data["malicious"].sum() / len(train_data)
-test_data = get_testing_data(nrows=None)
+test_data = get_testing_data(nrows=100).astype(float)
 # print(contamination)
 # for mc in [LOF, ISOF, RobustCovariance, OneClassSVM]:
 #     try:
@@ -235,18 +235,19 @@ test_data = get_testing_data(nrows=None)
 #     except Exception as e:
 #         print(mc, e)
 
-print(train_data.columns.values)
+#
+ignore = ["attack", "malicious", "time", "packet_id", "filename", "capturename"]
+features = [c for c in train_data.columns.values if not(c in ignore)]
 
-ignore = ["attack", "malicious", "time", "packet_id"]
+for i in range(0,len(features), 5):
+    for mc in [XGBoost]:#, RandomForest, MLP, AdaBoost, SVM]:
+        print(mc)
+        mini_feat = features[i:i+5]
+        if True:
+            model = mc(mini_feat)
+            model.train(train_data)
+            model.test(test_data)
 
-for mc in [XGBoost, RandomForest, MLP, AdaBoost, SVM]:
-    print(mc)
-    try:
-        model = mc([c for c in train_data.columns.values if not(c in ignore)])
-        model.train(train_data)
-        model.test(test_data)
-
-    except Exception as e:
-        print(mc, e)
-
+        # except Exception as e:
+        #     print(mc, e)
 

@@ -92,7 +92,7 @@ def pcap_to_df(file_name, out_csv_name):
     df = []
     for i, pkt in enumerate(PcapReader(file_name)):
         data = pkt_as_dict(pkt)
-        data["bytes"] = str(pkt)
+        #data["bytes"] = str(pkt)
         data["packet_id"] = i + 1
         df.append(data)
     df = pd.DataFrame(df)
@@ -106,7 +106,7 @@ def pcap_to_df(file_name, out_csv_name):
 
 
 def download_and_label_data(labels, data_dir):
-    dfs = []
+    #dfs = []
     for folder in labels["folder"].unique():
 
         zipfilename = data_dir / (folder + ".zip")
@@ -118,27 +118,32 @@ def download_and_label_data(labels, data_dir):
             archive = zipfile.ZipFile(zipfilename)
 
         for pcap_filename in labels[labels["folder"] == folder]["relevant_files"].unique():
+
             pcap_headless_filepath = str(Path(*pcap_filename.parts[1:]))
             csv_filename = Path(data_dir) / pcap_headless_filepath.replace("pcap", "csv").replace("/", "_")
+
             if csv_filename.exists():
                 df = pd.read_csv(csv_filename)
+                df.drop(columns=["bytes"], inplace=True)
+                df.to_csv(csv_filename, index=False)
             else:
                 archive.extract(pcap_headless_filepath, data_dir)  # remove top level of posix path (data_dir)
                 df = pcap_to_df(pcap_filename, out_csv_name=csv_filename)
 
-            # label_data
-            df["malicious"] = 0
-            df["attack_type"] = "clean"
-            attack = labels[(labels["folder"] == folder) & (labels["relevant_files"] == pcap_filename) & (labels["malicious"] == 1)]
-            assert len(attack) <= 1, attack # should only be one or zero attack periods for this code to work
-            if len(attack):
-                start, end = attack[["start_packet", "end_packet"]].values.flatten().astype(int)
-                df.loc[(df["packet_id"] >= start) & (df["packet_id"] < end), "malicious"] = 1
-                df.loc[df["malicious"] == 1, "attack_type"] = attack["attack"].values[0]
-            df.to_csv(csv_filename, index=False)
-            dfs.append(df)
+            if not "malicious" in df.columns.values:
+                # label_data
+                df["malicious"] = 0
+                df["attack_type"] = "clean"
+                attack = labels[(labels["folder"] == folder) & (labels["relevant_files"] == pcap_filename) & (labels["malicious"] == 1)]
+                assert len(attack) <= 1, attack # should only be one or zero attack periods for this code to work
+                if len(attack):
+                    start, end = attack[["start_packet", "end_packet"]].values.flatten().astype(int)
+                    df.loc[(df["packet_id"] >= start) & (df["packet_id"] < end), "malicious"] = 1
+                    df.loc[df["malicious"] == 1, "attack_type"] = attack["attack"].values[0]
+                df.to_csv(csv_filename, index=False)
+            # dfs.append(df)
 
-    df = pd.concat(dfs)
-    df.to_csv(data_dir/"dataset.csv", index=False)
+    # df = pd.concat(dfs)
+    # df.to_csv(data_dir/"dataset.csv", index=False)
 
 

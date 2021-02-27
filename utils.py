@@ -14,6 +14,9 @@ data_dir = Path("datasets")
 dataset_file = data_dir / "dataset.csv"
 train_test_cutoff = 0.75
 
+usecols = []
+categorical = "IP__proto", "TCP__flags"
+
 def get_all_data():
     if dataset_file.exists():
         return
@@ -23,19 +26,25 @@ def get_all_data():
     if not labels["relevant_files_exists"].all():
         download_and_label_data(labels, data_dir)
 
-def __get_dataset(train=True):
-    get_all_data()
-    all_data = pd.read_csv(dataset_file)
+def __get_dataset(train=True, nrows=100):
+    #get_all_data()
+
+    all_data = pd.concat([pd.read_csv(f, nrows=nrows).iloc[::10] for f in data_dir.iterdir() if f.suffix == ".csv"])
+    all_data.fillna(0, inplace=True)
+    all_data = all_data[[c for c in all_data.columns.values if not(all_data[c].dtype in [str, object])]]
+    for c in all_data.columns.values:
+        print(c, all_data[c].unique()[:5], all_data[c].dtype)
     split_point = int(train_test_cutoff * len(all_data))
     if train:
-        return all_data[:split_point]
-    return all_data[split_point:]
+        ret = all_data[:split_point]
+    else:
+        ret = all_data[split_point:]
+    print(ret["malicious"].value_counts())
+    return ret
 
-def get_training_data():
-    return __get_dataset(train=True)
+def get_training_data(nrows=None):
+    return __get_dataset(train=True, nrows=nrows)
 
-def get_testing_data():
-    return __get_dataset(train=False)
+def get_testing_data(nrows=None):
+    return __get_dataset(train=False, nrows=nrows)
 
-
-get_all_data()
