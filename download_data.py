@@ -28,6 +28,27 @@ data_files = {
     },
 }
 
+keep_features = ["Ethernet__type", "IP__src", "IP__dst", "IP__ihl", "IP__tos", "IP__len", "IP__id", "IP__ttl", "IP__flags",
+                 "IP__frag",
+                 "IP__proto", "IP__chksum", "TCP__sport", "TCP__flags",
+                 "TCP__dport", "TCP__seq", "TCP__ack", "TCP__dataofs",
+                 "TCP__reserved", "TCP__options", "TCP__chksum"
+                 "TCP__window", "TCP__chksum", "ModbusADU__transId",
+                 "ModbusADU__protoId", "ModbusADU__len", "ModbusADU__unitId", "time", "UDP__sport", "UDP__dport", "UDP__len",
+                 "UDP__chksum", "IPv6__version", "IPv6__fl", "IPv6__plen", "IPv6__nh", "IPv6__hlim",
+                 "IPv6 Extension Header - Hop-by-Hop Options Header__nh", "BOOTP__hlen", "BOOTP__xid", "BOOTP__secs",
+                 "ICMPv6 Neighbor Discovery - Neighbor Solicitation__type", "ICMPv6 Neighbor Discovery - Neighbor Solicitation__cksum",
+                 "ICMPv6 Neighbor Discovery - Router Solicitation__type", "ICMPv6 Neighbor Discovery - Router Solicitation__cksum",
+                 "ICMP__type", "ICMP__chksum", "ICMP__id", "ICMP__seq", "DHCPv6 Solicit Message__msgtype", "DHCPv6 Solicit Message__trid",
+                 "DHCP6 Elapsed Time Option__optcode", "DHCP6 Elapsed Time Option__optlen", "DHCP6 Elapsed Time Option__elapsedtime",
+                 "DHCP6 Client Identifier Option__optcode", "vendor class data_   |_len", "DHCP6 Option Request Option__optcode",
+                 "DHCP6 Option Request Option__optlen", "IP Option Router Alert_   |_option", "IP Option Router Alert_   |_length",
+                 "Link Local Multicast Node Resolution - Query__id", "Link Local Multicast Node Resolution - Query__qdcount",
+                 "DNS Question Record_   |_qtype", "DNS Question Record_   |_qclass",
+                 "ICMPv6 Neighbor Discovery Option - Source Link-Layer Address__type",
+                 "ICMPv6 Neighbor Discovery Option - Source Link-Layer Address__len",
+                 ]
+
 def download(url, outfile, dataset_number=1):
     response = requests.get(url, stream=True)
     if (response.status_code != 200):
@@ -64,8 +85,9 @@ def pkt_as_dict(pkt, indent=3, lvl="",
                 _iterpacket=0
             )  # type: SetGen[Packet]
             for fvalue in fvalue_gen:
-                ret[key] = pkt_as_dict(fvalue, indent=indent, label_lvl=label_lvl + lvl + "   |",
-                                          first_call=ret)  # noqa: E501
+                if key in keep_features:
+                    ret[key] = pkt_as_dict(fvalue, indent=indent, label_lvl=label_lvl + lvl + "   |",
+                                              first_call=ret)  # noqa: E501
         else:
             key = "{}_{}_{}".format(pkt.name, label_lvl + lvl, f.name)
             if isinstance(fvalue, str):
@@ -73,7 +95,9 @@ def pkt_as_dict(pkt, indent=3, lvl="",
                                                               len(lvl) +
                                                               len(f.name) +
                                                               4))
-            ret[key] = fvalue
+
+            if key in keep_features:
+                ret[key] = fvalue
     if pkt.payload:
         pkt_as_dict(pkt.payload,
             indent=indent,
@@ -96,9 +120,10 @@ def pcap_to_df(file_name, out_csv_name):
         data["packet_id"] = i + 1
         df.append(data)
     df = pd.DataFrame(df)
-    df["attack_type"] = file_name.split("/")[-2]
     df["filename"] = file_name.split("/")[-1]
-    df["capturename"] = file_name.split("/")[-3]
+    if len(file_name.split("/")) > 2:
+        df["attack_type"] = file_name.split("/")[-2]
+        df["capturename"] = file_name.split("/")[-3]
     df["time_delta"] = df["time"].diff()
     df.to_csv(out_csv_name, index=False)
     print("done parsing {}".format(file_name))
@@ -106,7 +131,7 @@ def pcap_to_df(file_name, out_csv_name):
 
 
 def download_and_label_data(labels, data_dir):
-    #dfs = []
+    dfs = []
     for folder in labels["folder"].unique():
 
         zipfilename = data_dir / (folder + ".zip")
@@ -124,8 +149,6 @@ def download_and_label_data(labels, data_dir):
 
             if csv_filename.exists():
                 df = pd.read_csv(csv_filename)
-                df.drop(columns=["bytes"], inplace=True)
-                df.to_csv(csv_filename, index=False)
             else:
                 archive.extract(pcap_headless_filepath, data_dir)  # remove top level of posix path (data_dir)
                 df = pcap_to_df(pcap_filename, out_csv_name=csv_filename)
@@ -141,9 +164,8 @@ def download_and_label_data(labels, data_dir):
                     df.loc[(df["packet_id"] >= start) & (df["packet_id"] < end), "malicious"] = 1
                     df.loc[df["malicious"] == 1, "attack_type"] = attack["attack"].values[0]
                 df.to_csv(csv_filename, index=False)
-            # dfs.append(df)
+            dfs.append(df)
 
-    # df = pd.concat(dfs)
-    # df.to_csv(data_dir/"dataset.csv", index=False)
-
+    df = pd.concat(dfs)
+    df.to_csv(data_dir/"dataset.csv", index=False)
 

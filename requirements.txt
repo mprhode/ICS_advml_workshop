@@ -6,6 +6,5 @@ scapy[basic] --pre
 sklearn
 py7zr
 matplotlib
-seaborn
 PyYAML
-xgboost
+adversarial-robustness-toolbox
