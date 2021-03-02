@@ -27,9 +27,9 @@ eps = np.finfo('float64').eps
 for item in model_folder.iterdir():
     if item.suffix == ".zip":
         if not (model_folder/item.stem).exists():
-                z = ZipFile(item)
-                z.extractall(model_folder)
-                z.close()
+            z = ZipFile(item)
+            z.extractall(model_folder)
+            z.close()
 
 class Model():
     def __init__(self, features, save_model_name=None, verbose=True):
@@ -173,17 +173,30 @@ class BlackBoxModel(Model):
     def save_model(self):
         return self.call_model
 
-    def prep_data(self, data, train=False):
-        for f in self.__features:
-            if not (f in data.columns.values):
-                data[f] = 0
-        x = data[self.__features].values
-        labels = data["malicious"].values.astype(int)
+    def prep_data(self, data, train=False, malicious=1):
+        if type(data) is tuple:
+            x, labels = data
+        else:
+            if (type(data) is str) and (".pcap" in data):
+                data = self.parse_pcap(data)
+            elif type(data) is np.ndarray:
+                data = pd.DataFrame(data, columns=self.features)
+            if not ("malicious" in data.columns.values):
+                data["malicious"] = 1
+
+            if not self.anomaly and train:
+                data = self.balance_data(data)
+            else:
+                for f in self.__features:
+                    if not (f in data.columns.values):
+                        data[f] = 0
+            x = data[self.__features].values
+            labels = data["malicious"].values.astype(int)
         assert len(x) == len(labels)
         return x, labels
 
     def test(self, data):
-        try:
+        if True: #try:
             x, labels = self.prep_data(data, malicious=1)
             predictions = self.get_predictions(x)
             predictions = predictions.round()
@@ -191,14 +204,13 @@ class BlackBoxModel(Model):
             print("{:.2f}% ({}) packets detected".format(total_detect*100/len(predictions), total_detect))
             # todo breakdown by packet type
             return predictions
-        except Exception:
-            return "No result"
+        # except Exception:
+        #     return "No result"
 
     def __str__(self):
         return "No model data"
 
 
-modelA = BlackBoxModel(save_model_name="modelA")
 modelB = BlackBoxModel(save_model_name="modelB")
 modelC = BlackBoxModel(save_model_name="modelC")
 
