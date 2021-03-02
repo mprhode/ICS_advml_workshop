@@ -1,7 +1,7 @@
 import requests
 from pathlib import Path
 from os import listdir
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_DEFLATED
 import json
 from tqdm import tqdm
 import scapy
@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from download_data import download_and_label_data
 from scapy.utils import RawPcapReader
+import zlib
 
 data_dir = Path("datasets")
 training_set_file = data_dir / "train.csv"
@@ -31,11 +32,18 @@ ignore_packet = ["TCP__chksum", "IP__chksum", "TCP__options", "UDP__chksum", "TC
                  "ModbusADU__transId", "ICMP__chksum", "ICMP__seq", "Link Local Multicast Node Resolution - Query__id",
                  "ICMPv6 Neighbor Discovery - Neighbor Solicitation__cksum",
                  "ICMPv6 Neighbor Discovery - Router Solicitation__cksum", "BOOTP__xid", "BOOTP__hlen", "ICMP__chksum", "ICMP__id",
-                 "ICMP__seq", "DHCPv6 Solicit Message__trid"
-                 ]
+                 "ICMP__seq", "DHCPv6 Solicit Message__trid"]
 ignore += ignore_packet
 
+def reconstitute_data(training_set_file, testing_set_file):
+    for file in [training_set_file, testing_set_file]:
+        file = str(file)
+        decompress(file.replace(".csv", "1.zip"), data_dir)
+        decompress(file.replace(".csv", "2.zip"), data_dir)
+        pd.concat([pd.read_csv(file + "_1"), pd.read_csv(file + "_2")]).to_csv(file, index=False)
+
 if not(training_set_file.exists()) or not(testing_set_file.exists()):
+    reconstitute_data()
     labels = pd.read_csv(data_dir/"packet_labels.csv", delimiter=";")
     labels["relevant_files"] = labels[["folder", "attack", "filename"]].apply(lambda x: data_dir/x["folder"]/x["attack"]/x["filename"], axis=1)
     labels["relevant_files_exists"] = labels["relevant_files"].apply(lambda x: x.exists())
@@ -149,30 +157,29 @@ def get_label_array(pcap_file, mal_start=None, mal_end=None):
     mal_benign_labels[mal_start:mal_end] = 1
     return mal_benign_labels
 
-# def file_in_zip_parts():
-#     for file in [training_set_file, testing_set_file]:
-#         data = pd.read_csv(file)
-#         split = len(data) // 3
-#         filenames = [str(file)+ "_{}".format(i) for i in range(1, 4)]
-#         data[:split].to_csv(str(file)+ "_1", index=False)
-#         data[split:split*2].to_csv(str(file)+ "_2", index=False)
-#         data[split*2:].to_csv(str(file)+ "_3", index=False)
-#         for part in filenames:
-#             zipObj = ZipFile(str(part).replace(".csv", ".zip"), 'w')
-#             zipObj.write(part)
-#             zipObj.close()
-#
-# def reconstitute_data():
-#     for file in [training_set_file, testing_set_file]:
-#         filenames = [str(file) + "_{}".format(i)for i in range(1, 4)]
-#         dfs = []
-#         for part in filenames:
-#             zipObj = ZipFile(part)
-#             csv_file = part.replace(".zip", ".csv")
-#             zipObj.extractall(csv_file)
-#             zipObj.close()
-#             dfs.append(pd.read_csv(csv_file))
-#         pd.concat(dfs).to_csv(file, index=False)
 
-# if __name__ == "__main__":
-#     file_in_zip_parts()
+def compress(zipfilename, filename):
+    zipObj = ZipFile(zipfilename, 'w', compression=ZIP_DEFLATED)
+    zipObj.write(filename)
+    zipObj.close()
+
+def decompress(zipfilename, outfolder):
+    zipObj = ZipFile(zipfilename)
+    zipObj.extractall(outfolder)
+    zipObj.close()
+
+def file_in_parts(training_set_file, testing_set_file):
+    for file in [training_set_file, testing_set_file]:
+        data = pd.read_csv(file)
+        split = len(data) // 2
+        file = str(file)
+        data[:split].to_csv(file + "_1")
+        data[split:].to_csv(file + "_2")
+        compress(file.replace(".csv", "1.zip"), file + "_1")
+        compress(file.replace(".csv", "2.zip"), file + "_2")
+
+
+
+
+if __name__ == "__main__":
+    file_in_parts()
