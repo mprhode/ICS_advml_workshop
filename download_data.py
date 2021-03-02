@@ -173,3 +173,13 @@ def download_and_label_data(labels, data_dir):
     pd.concat(train_dfs).to_csv(data_dir/"train.csv", index=False)
     pd.concat(test_dfs).to_csv(data_dir/"test.csv", index=False)
 
+if __name__ == "__main__":
+    data_dir = Path("datasets")
+    training_set_file = data_dir / "train.csv"
+    testing_set_file = data_dir / "test.csv"
+    if not (training_set_file.exists()) or not (testing_set_file.exists()):
+        labels = pd.read_csv(data_dir / "packet_labels.csv", delimiter=";")
+        labels["relevant_files"] = labels[["folder", "attack", "filename"]].apply(
+            lambda x: data_dir / x["folder"] / x["attack"] / x["filename"], axis=1)
+        labels["relevant_files_exists"] = labels["relevant_files"].apply(lambda x: x.exists())
+        download_and_label_data(labels, data_dir)

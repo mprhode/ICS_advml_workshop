@@ -147,3 +147,31 @@ def get_label_array(pcap_file, mal_start=None, mal_end=None):
     mal_benign_labels = np.zeros(n_packets)
     mal_benign_labels[mal_start:mal_end] = 1
     return mal_benign_labels
+
+# def file_in_zip_parts():
+#     for file in [training_set_file, testing_set_file]:
+#         data = pd.read_csv(file)
+#         split = len(data) // 3
+#         filenames = [str(file)+ "_{}".format(i) for i in range(1, 4)]
+#         data[:split].to_csv(str(file)+ "_1", index=False)
+#         data[split:split*2].to_csv(str(file)+ "_2", index=False)
+#         data[split*2:].to_csv(str(file)+ "_3", index=False)
+#         for part in filenames:
+#             zipObj = ZipFile(str(part).replace(".csv", ".zip"), 'w')
+#             zipObj.write(part)
+#             zipObj.close()
+#
+# def reconstitute_data():
+#     for file in [training_set_file, testing_set_file]:
+#         filenames = [str(file) + "_{}".format(i)for i in range(1, 4)]
+#         dfs = []
+#         for part in filenames:
+#             zipObj = ZipFile(part)
+#             csv_file = part.replace(".zip", ".csv")
+#             zipObj.extractall(csv_file)
+#             zipObj.close()
+#             dfs.append(pd.read_csv(csv_file))
+#         pd.concat(dfs).to_csv(file, index=False)
+
+# if __name__ == "__main__":
+#     file_in_zip_parts()

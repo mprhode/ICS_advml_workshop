@@ -12,6 +12,7 @@ import pickle as pkl
 from pathlib import Path
 import yaml
 import matplotlib.pyplot as plt
+from zipfile import ZipFile
 
 from utils import classification_cols, df_handle_categorical, ignore
 from download_data import pcap_to_df
@@ -20,6 +21,14 @@ np.random.seed(1)
 
 model_folder = Path("Models")
 eps = np.finfo('float64').eps
+
+# unzip any models that need it
+for item in model_folder.iterdir():
+    if item.suffix == ".zip":
+        if not (model_folder/item.name).exists():
+                z = ZipFile(item)
+                z.extractall(model_folder/item.name)
+                z.close()
 
 class Model():
     def __init__(self, features, save_model_name=None):
