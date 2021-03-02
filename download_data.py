@@ -187,12 +187,11 @@ def decompress(zipfilename, outfolder):
     zipObj.extractall(outfolder)
     zipObj.close()
 
-
 def reconstitute_data(training_set_file, testing_set_file):
     for file in [training_set_file, testing_set_file]:
         file = str(file)
-        decompress(file.replace(".csv", "1.zip"), data_dir)
-        decompress(file.replace(".csv", "2.zip"), data_dir)
+        decompress(file.replace(".csv", "1.zip"), ".")
+        decompress(file.replace(".csv", "2.zip"), ".")
         pd.concat([pd.read_csv(file + "_1"), pd.read_csv(file + "_2")]).to_csv(file, index=False)
 
 
