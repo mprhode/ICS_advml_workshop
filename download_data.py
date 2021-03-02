@@ -131,7 +131,8 @@ def pcap_to_df(file_name, out_csv_name):
 
 
 def download_and_label_data(labels, data_dir):
-    dfs = []
+    train_dfs = []
+    test_dfs = []
     for folder in labels["folder"].unique():
 
         zipfilename = data_dir / (folder + ".zip")
@@ -143,7 +144,6 @@ def download_and_label_data(labels, data_dir):
             archive = zipfile.ZipFile(zipfilename)
 
         for pcap_filename in labels[labels["folder"] == folder]["relevant_files"].unique():
-
             pcap_headless_filepath = str(Path(*pcap_filename.parts[1:]))
             csv_filename = Path(data_dir) / pcap_headless_filepath.replace("pcap", "csv").replace("/", "_")
 
@@ -164,8 +164,12 @@ def download_and_label_data(labels, data_dir):
                     df.loc[(df["packet_id"] >= start) & (df["packet_id"] < end), "malicious"] = 1
                     df.loc[df["malicious"] == 1, "attack_type"] = attack["attack"].values[0]
                 df.to_csv(csv_filename, index=False)
-            dfs.append(df)
+            train_test = labels[(labels["folder"] == folder) & (labels["relevant_files"] == pcap_filename)]["train_test"].values[0]
+            if train_test == "train":
+                train_dfs.append(df)
+            else:
+                test_dfs.append(df)
 
-    df = pd.concat(dfs)
-    df.to_csv(data_dir/"dataset.csv", index=False)
+    pd.concat(train_dfs).to_csv(data_dir/"train.csv", index=False)
+    pd.concat(test_dfs).to_csv(data_dir/"test.csv", index=False)
 

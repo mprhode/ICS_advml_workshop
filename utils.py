@@ -12,9 +12,8 @@ from download_data import download_and_label_data
 from scapy.utils import RawPcapReader
 
 data_dir = Path("datasets")
-dataset_file = data_dir / "dataset.csv"
-train_test_cutoff = 0.5
-
+training_set_file = data_dir / "train.csv"
+testing_set_file = data_dir / "test.csv"
 
 categorical = ["Ethernet__type", "IP__dst", "IP__src", "IP__proto",  "IP__flags", "IP__tos",
                "TCP__flags", "ICMP__type", "ICMPv6 Neighbor Discovery - Neighbor Solicitation__type",
@@ -36,24 +35,19 @@ ignore_packet = ["TCP__chksum", "IP__chksum", "TCP__options", "UDP__chksum", "TC
                  ]
 ignore += ignore_packet
 
-df = pd.read_csv("datasets/dataset.csv", usecols=["malicious", "IP__src", "TCP__sport", "TCP__dport", "UDP__sport", "UDP__dport"])
-split_point = int(train_test_cutoff * len(df))
-clean_train = df[(df["malicious"] == 0) & (df.index < split_point)]
+if not(training_set_file.exists()) or not(testing_set_file.exists()):
+    labels = pd.read_csv(data_dir/"packet_labels.csv", delimiter=";")
+    labels["relevant_files"] = labels[["folder", "attack", "filename"]].apply(lambda x: data_dir/x["folder"]/x["attack"]/x["filename"], axis=1)
+    labels["relevant_files_exists"] = labels["relevant_files"].apply(lambda x: x.exists())
+    download_and_label_data(labels, data_dir)
+
+df = pd.read_csv(training_set_file, usecols=["malicious", "IP__src", "TCP__sport", "TCP__dport", "UDP__sport", "UDP__dport"])
+clean_train = df[df["malicious"] == 0]
 clean_train_srcIP = clean_train["IP__src"].unique()
 clean_train_tcpsrcport = clean_train["TCP__sport"].value_counts().head(5).keys()
 clean_train_tcpdstport = clean_train["TCP__dport"].value_counts().head(5).keys()
 clean_train_udpsrcport = clean_train["UDP__sport"].value_counts().head(5).keys()
 clean_train_udpdstport = clean_train["UDP__dport"].value_counts().head(5).keys()
-
-def get_all_data():
-    if dataset_file.exists():
-        return
-    labels = pd.read_csv(data_dir/"packet_labels.csv", delimiter=";")
-    labels["relevant_files"] = labels[["folder", "attack", "filename"]].apply(lambda x: data_dir/x["folder"]/x["attack"]/x["filename"], axis=1)
-    labels["relevant_files_exists"] = labels["relevant_files"].apply(lambda x: x.exists())
-    # print(labels["relevant_files_exists"])
-    #if not labels["relevant_files_exists"].all():
-    download_and_label_data(labels, data_dir)
 
 def one_hot_encode(df, col, include=None):
     try:
@@ -77,28 +71,22 @@ def df_handle_categorical(df):
     df = one_hot_encode(df, "UDP__dport", include=clean_train_udpdstport)
     return df.fillna(0)
 
-def __get_dataset(train=True, nrows=None, filename="datasets/dataset.csv", train_test_cutoff=train_test_cutoff):
-    get_all_data()
-    nrows = nrows if train or (nrows is None) else nrows + split_point
-    all_data = pd.read_csv(filename, nrows=nrows)
-    all_data.drop(columns=ignore, inplace=True, axis=1, errors="ignore")
+def __get_dataset(train=True, nrows=None, filename=training_set_file):
+    filename = training_set_file if train else testing_set_file
+    df = pd.read_csv(filename, nrows=nrows)
+    df.drop(columns=ignore, inplace=True, axis=1, errors="ignore")
+    df.fillna(0, inplace=True)
 
-    all_data.fillna(0, inplace=True)
-    if train:
-        ret = all_data[:split_point].copy()
-    else:
-        ret = all_data[split_point:].copy()
+    df = df_handle_categorical(df)
 
-    ret = df_handle_categorical(ret)
-
-    print(ret["malicious"].value_counts())
+    print(df["malicious"].value_counts())
     try:
-        print(ret["attack_type"].value_counts())
-        ret.drop(columns=["attack_type"], axis=1, inplace=True)
+        print(df["attack_type"].value_counts())
+        df.drop(columns=["attack_type"], axis=1, inplace=True)
     except KeyError:
         pass
 
-    return ret.astype(float)
+    return df.astype(float)
 
 def get_training_data(nrows=None):
     return __get_dataset(train=True, nrows=nrows)

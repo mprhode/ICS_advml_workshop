@@ -7,7 +7,6 @@ from sklearn.neighbors import LocalOutlierFactor
 from sklearn import svm
 #import xgboost as xgb
 
-
 import numpy as np
 import pickle as pkl
 from pathlib import Path
@@ -49,9 +48,9 @@ class Model():
     def balance_data(self, data):
         ben_rows = data[data["malicious"] == 0].index
         mal_rows = data[data["malicious"] == 1].index
-        max_class = max(len(ben_rows), len(mal_rows))
-        ben_rows = ben_rows[:max_class]
-        mal_rows = mal_rows[:max_class]
+        min_class = min(len(ben_rows), len(mal_rows)) - 1 # -1 to allow easy coding for np.random.choice() below
+        ben_rows = np.random.choice(ben_rows, size=min_class, replace=False)
+        mal_rows = np.random.choice(mal_rows, size=min_class, replace=False)
         return data[data.index.isin(ben_rows) | data.index.isin(mal_rows)]
 
     def prep_data(self, data, train=False):
@@ -122,7 +121,7 @@ class Model():
             self.call_model = pkl.load(f)
         with open(self.save_model_path / "config.yml", "r") as f:
             self.config = yaml.load(f)
-        self.features = self.config["features"]
+        self.features = list(self.config["features"])
         if "contamination" in self.config.keys():
             self.contamination = self.config["contamination"]
             self.anomaly = True
@@ -145,6 +144,55 @@ class Model():
         return self.call_model
 
 
+class BlackBoxModel(Model):
+    def __init__(self, save_model_name=None):
+        super(BlackBoxModel, self).__init__(None, save_model_name=save_model_name)
+        print(self.config)
+        self.__features = [f for f in self.features]
+        self.features = None
+
+    def train(self):
+        return self.call_model
+
+    def save_model(self):
+        return self.call_model
+
+    def prep_data(self, data, train=False):
+        for f in self.__features:
+            if not (f in data.columns.values):
+                data[f] = 0
+        x = data[self.__features].values
+        labels = data["malicious"].values.astype(int)
+        assert len(x) == len(labels)
+        return x, labels
+
+    def test(self, data):
+        try:
+            if type(data) is tuple:
+                x, labels = data
+            else:
+                if type(data) is str and ".pcap" in data:
+                    data = self.parse_pcap(data)
+                    data["malicious"] = 1
+                x, labels = self.prep_data(data)
+
+            predictions = self.get_predictions(x)
+            predictions = predictions.round()
+            total_detect = predictions.sum()
+            print("{:.2f}% ({}) packets detected".format(total_detect*100/len(predictions), total_detect))
+            # todo breakdown by packet type
+            return predictions
+        except Exception:
+            return "No result"
+
+    def __str__(self):
+        return "No model data"
+
+
+modelA = BlackBoxModel(save_model_name="modelA")
+modelB = BlackBoxModel(save_model_name="modelB")
+modelC = BlackBoxModel(save_model_name="modelC")
+
 class AnomalyModel(Model):
     def __init__(self, features, contamination=None, save_model_name=None):
         super(AnomalyModel, self).__init__(features, save_model_name=save_model_name)
@@ -165,11 +213,6 @@ class OneClassSVM(AnomalyModel):
         super(OneClassSVM, self).__init__(features, contamination=contamination, save_model_name=save_model_name)
         if not (self.save_model_path).exists():
             self.call_model = svm.OneClassSVM(nu=self.config["contamination"])
-
-# class RobustCovariance(AnomalyModel):
-#     def __init__(self, features, contamination=None, save_model_name=None):
-#         super(RobustCovariance, self).__init__(features, contamination=contamination, save_model_name=save_model_name)
-#         self.call_model = EllipticEnvelope(contamination=self.config["contamination"])
 
 class ISOF(AnomalyModel):
     def __init__(self, features, contamination=None, save_model_name=None):
@@ -287,86 +330,15 @@ class DecisionTree(SupervisedModel):
         plot_tree(self.call_model)
         plt.show()
 
-# class NN(SupervisedModel):
-#     def __init__(self, features, save_model_name=None):
-#         super(DecisionTree, self).__init__(features, save_model_name=save_model_name)
-#
-#         if self.save_model_path.exists():
-#             self.load_model()
-#         else:
-#             model = tf.keras.Sequential([
-#                 tf.keras.layers.Flatten(input_shape=(len(self.features), None)),
-#                 tf.keras.layers.ReLu(128, activation=tf.nn.relu),
-#                 tf.keras.layers.Dropout(0.2),
-#                 tf.keras.layers.ReLu(128, activation=tf.nn.relu),
-#                 tf.keras.layers.Dropout(0.2),
-#                 tf.keras.layers.Dense(1),
-#                 tf.keras.layers.Activation(tf.nn.sigmoid)
-#                 # We seperate the activation layer to be able to access the logits of the previous layer later
-#             ])
-#             self.config["model_layers"] = (("in", len(self.features)), ("h1", 128), ("drop1", 0.2), ("h2", 128), ("drop2", 0.2), ("h3", 1))
-#             model.compile(optimizer='adam',
-#                           loss='binary_crossentropy',
-#                           metrics=['accuracy'])
-#             self.call_model = model
-#         self.model_name = "NN"
-#
-#     def prep_data(self, data, train=False):
-#         if train:
-#             data = self.balance_data(data)
-#             self.means = data[self.features].mean(axis=0)
-#             self.stdvs = data[self.features].std(axis=0)
-#         x = (data[self.features].values - self.means) / self.stdvs
-#         labels = data["malicious"].values.astype(int)
-#         return x, labels
-#
-#     def fit_model(self, x, labels):
-#         callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3)
-#         model.fit(x, labels, epochs=100, validation_split=0.1, callbacks=[callback], batch_size=256,
-#                   verbose=0)
-#
-#     def load_model(self):
-#         another_strategy = tf.distribute.OneDeviceStrategy("/cpu:0")
-#         with another_strategy.scope():
-#             self.call_model = tf.keras.models.load_model(self.save_model_path/"model.bin")  # load data
-#         with open(self.save_model_path / "config.yml", "r") as f:
-#             self.config = yaml.load(f)
-#
-#     def save_model(self):
-#         if self.model_exists:
-#             print("not saving model as model already exists")
-#             return
-#         # save model and config details
-#         print("saving model...")
-#         self.save_model_path.mkdir()
-#         another_strategy = tf.distribute.OneDeviceStrategy("/cpu:0")
-#         with another_strategy.scope():
-#             tf.keras.models.save_model(self.call_model, self.save_model_path/"model.bin")
-#         with open(self.save_model_path/"config.yml", "w") as f:
-#             yaml.dump(self.config, f)
-
 
 if __name__ == "__main__":
     from utils import get_testing_data, get_training_data
     import numpy as np
 
-
-    # import gc
-    # gc.collect()
-
     train_data = get_training_data(nrows=None)
 
     features = [c for c in train_data.columns.values if not(c in classification_cols)]
-    print(np.random.randint(1, len(features)))
-    np.random.sample(features, np.random.randint(1, len(features)))
-    # for f in features:
-    #     print(f, train_data[f].dtype, end=" ")
-    #     try:
-    #         print(train_data[f].var().round(4), end=" ")
-    #     except TypeError:
-    #         print("    ")
-    #     print(train_data[f].nunique(), (train_data[f] > 0).sum(),  train_data[f].unique()[:6])
-
+    print(features)
 
     contamination = train_data["malicious"].sum() / len(train_data)
     test_data = get_testing_data(nrows=None)
@@ -379,28 +351,22 @@ if __name__ == "__main__":
                             ("OneClassSVM", OneClassSVM),
                            ("LOF", LOF)]:
         for feat_name, mini_feat in [
-            ("time_model", ["time_delta", "IP__ttl"] + [x for x in features if "Ethernet__type" in x]),
+            ("time_model", ["time_delta", "IP__ttl"] + [x for x in features if (  "Ethernet__type" in x) or ("IP__proto" in x)]),
             ("src_dst_features", [x for x in features if ("src" in x) or ("dst" in x) or ("port" in x)]),
             ("all", features),
             ("all_except_src_dst", [x for x in features if not("src" in x) and not("dst" in x) and not("port" in x)]),
             ("IP_features", [x for x in features if "IP__" in x]),
-            ("tcp_udp_modbus_icmp_boot", [x for x in features if ("TCP_" in x) or ("UDP_" in x) or ("MODBUS_" in x) or ("ICMP" in x) or ("BOOT" in x)]),
-            ("random1", np.random.sample(features, np.random.randint(1, len(features)))),
-            ("random2", np.random.sample(features, np.random.randint(1, len(features)))),
-            ("random3", np.random.sample(features, np.random.randint(1, len(features))))
-            ]:
+            ("tcp_udp_modbus_icmp_boot", [x for x in features if ("TCP_" in x) or ("UDP_" in x) or ("MODBUS_" in x) or ("ICMP" in x) or ("BOOT" in x)])
+        ]:
 
-            if True:
-                print("\n", mc, mini_feat)
-                if mc in AD_models:
-                    model = mc(mini_feat, save_model_name="{}_{}".format(feat_name, model_name), contamination=contamination)
-                else:
-                    model = mc(mini_feat, save_model_name="{}_{}".format(feat_name, model_name))
-                if model.model_exists:
-                    continue
-                model.train(train_data)
-                model.test(test_data)
-            # except Exception as e:
-            #     print(">>>>>>>>>>>>>>>>>", e)
+            print("\n", mc, mini_feat)
+            if mc in AD_models:
+                model = mc(mini_feat, save_model_name="{}_{}".format(feat_name, model_name), contamination=contamination)
+            else:
+                model = mc(mini_feat, save_model_name="{}_{}".format(feat_name, model_name))
+            if model.model_exists:
+                continue
+            model.train(train_data)
+            model.test(test_data)
 
 
