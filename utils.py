@@ -137,7 +137,6 @@ def compare_data(real, adversarial, columns):
     print(df)
 
 
-attacker_test_set = "/home/tilda/projects/ICS_advml_workshop/datasets/eth2dump-pingFloodDDoS1m-0,5h_1.pcap"
 def get_label_array(pcap_file, mal_start=None, mal_end=None):
     if attacker_test_set == "datasets/eth2dump-pingFloodDDoS1m-0,5h_1.pcap":
         mal_start, mal_end = 2933, 15636
