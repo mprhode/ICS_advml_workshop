@@ -129,7 +129,7 @@ class Model():
         with open(self.save_model_path / "model.pkl", "rb") as f:
             self.call_model = pkl.load(f)
         with open(self.save_model_path / "config.yml", "r") as f:
-            self.config = yaml.load(f)
+            self.config = yaml.load(f, Loader=yaml.FullLoader)
         self.features = list(self.config["features"])
         if "contamination" in self.config.keys():
             self.contamination = self.config["contamination"]
@@ -298,7 +298,7 @@ class XGBoost(SupervisedModel):
         bst = xgb.Booster({'nthread': self["config"]["nthread"]})  # init model
         self.trained_model = bst.load_model(self.save_model_path/"model.bin")  # load data
         with open(self.save_model_path / "config.yml", "r") as f:
-            self.config = yaml.load(f)
+            self.config = yaml.load(f, Loader=yaml.FullLoader)
 
     def save_model(self):
         if self.model_exists:
@@ -375,7 +375,11 @@ if __name__ == "__main__":
                 model = mc(mini_feat, save_model_name="{}_{}".format(feat_name, model_name))
             if model.model_exists:
                 continue
-            model.train(train_data)
+            if "svm" in model_name.lower():
+                model.train(train_data[::50])
+            else:
+                model.train(train_data)
+
             model.test(test_data)
 
 
