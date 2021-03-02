@@ -43,7 +43,7 @@ def reconstitute_data(training_set_file, testing_set_file):
         pd.concat([pd.read_csv(file + "_1"), pd.read_csv(file + "_2")]).to_csv(file, index=False)
 
 if not(training_set_file.exists()) or not(testing_set_file.exists()):
-    reconstitute_data()
+    reconstitute_data(training_set_file, testing_set_file)
     labels = pd.read_csv(data_dir/"packet_labels.csv", delimiter=";")
     labels["relevant_files"] = labels[["folder", "attack", "filename"]].apply(lambda x: data_dir/x["folder"]/x["attack"]/x["filename"], axis=1)
     labels["relevant_files_exists"] = labels["relevant_files"].apply(lambda x: x.exists())
