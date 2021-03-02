@@ -16,6 +16,8 @@ import zipfile
 from tqdm import tqdm
 from pathlib import Path
 
+data_dir = Path("datasets")
+
 data_files = {
     "captures1_v2.zip": {
         "url": "https://github.com/tjcruz-dei/ICS_PCAPS/releases/download/MODBUSTCP%231/captures1_v2.zip"
@@ -173,13 +175,44 @@ def download_and_label_data(labels, data_dir):
     pd.concat(train_dfs).to_csv(data_dir/"train.csv", index=False)
     pd.concat(test_dfs).to_csv(data_dir/"test.csv", index=False)
 
+
+def compress(zipfilename, filename):
+    zipObj = zipfile.ZipFile(zipfilename, 'w', compression=zipfile.ZIP_DEFLATED)
+    zipObj.write(filename)
+    zipObj.close()
+
+
+def decompress(zipfilename, outfolder):
+    zipObj = zipfile.ZipFile(zipfilename)
+    zipObj.extractall(outfolder)
+    zipObj.close()
+
+
+def reconstitute_data(training_set_file, testing_set_file):
+    for file in [training_set_file, testing_set_file]:
+        file = str(file)
+        decompress(file.replace(".csv", "1.zip"), data_dir)
+        decompress(file.replace(".csv", "2.zip"), data_dir)
+        pd.concat([pd.read_csv(file + "_1"), pd.read_csv(file + "_2")]).to_csv(file, index=False)
+
+
+def file_in_parts(training_set_file, testing_set_file):
+    for file in [training_set_file, testing_set_file]:
+        data = pd.read_csv(file)
+        split = len(data) // 2
+        file = str(file)
+        data[:split].to_csv(file + "_1")
+        data[split:].to_csv(file + "_2")
+        compress(file.replace(".csv", "1.zip"), file + "_1")
+        compress(file.replace(".csv", "2.zip"), file + "_2")
+
 if __name__ == "__main__":
-    data_dir = Path("datasets")
     training_set_file = data_dir / "train.csv"
     testing_set_file = data_dir / "test.csv"
     if not (training_set_file.exists()) or not (testing_set_file.exists()):
-        labels = pd.read_csv(data_dir / "packet_labels.csv", delimiter=";")
-        labels["relevant_files"] = labels[["folder", "attack", "filename"]].apply(
-            lambda x: data_dir / x["folder"] / x["attack"] / x["filename"], axis=1)
-        labels["relevant_files_exists"] = labels["relevant_files"].apply(lambda x: x.exists())
-        download_and_label_data(labels, data_dir)
+        reconstitute_data(training_set_file, testing_set_file)
+        # labels = pd.read_csv(data_dir / "packet_labels.csv", delimiter=";")
+        # labels["relevant_files"] = labels[["folder", "attack", "filename"]].apply(
+        #     lambda x: data_dir / x["folder"] / x["attack"] / x["filename"], axis=1)
+        # labels["relevant_files_exists"] = labels["relevant_files"].apply(lambda x: x.exists())
+        # download_and_label_data(labels, data_dir)

@@ -8,7 +8,7 @@ import scapy
 import py7zr
 import pandas as pd
 import numpy as np
-from download_data import download_and_label_data
+from download_data import download_and_label_data, reconstitute_data
 from scapy.utils import RawPcapReader
 import zlib
 
@@ -35,19 +35,14 @@ ignore_packet = ["TCP__chksum", "IP__chksum", "TCP__options", "UDP__chksum", "TC
                  "ICMP__seq", "DHCPv6 Solicit Message__trid"]
 ignore += ignore_packet
 
-def reconstitute_data(training_set_file, testing_set_file):
-    for file in [training_set_file, testing_set_file]:
-        file = str(file)
-        decompress(file.replace(".csv", "1.zip"), data_dir)
-        decompress(file.replace(".csv", "2.zip"), data_dir)
-        pd.concat([pd.read_csv(file + "_1"), pd.read_csv(file + "_2")]).to_csv(file, index=False)
+
 
 if not(training_set_file.exists()) or not(testing_set_file.exists()):
     reconstitute_data(training_set_file, testing_set_file)
-    labels = pd.read_csv(data_dir/"packet_labels.csv", delimiter=";")
-    labels["relevant_files"] = labels[["folder", "attack", "filename"]].apply(lambda x: data_dir/x["folder"]/x["attack"]/x["filename"], axis=1)
-    labels["relevant_files_exists"] = labels["relevant_files"].apply(lambda x: x.exists())
-    download_and_label_data(labels, data_dir)
+    # labels = pd.read_csv(data_dir/"packet_labels.csv", delimiter=";")
+    # labels["relevant_files"] = labels[["folder", "attack", "filename"]].apply(lambda x: data_dir/x["folder"]/x["attack"]/x["filename"], axis=1)
+    # labels["relevant_files_exists"] = labels["relevant_files"].apply(lambda x: x.exists())
+    # download_and_label_data(labels, data_dir)
 
 df = pd.read_csv(training_set_file, usecols=["malicious", "IP__src", "TCP__sport", "TCP__dport", "UDP__sport", "UDP__dport"])
 clean_train = df[df["malicious"] == 0]
@@ -156,30 +151,3 @@ def get_label_array(pcap_file, mal_start=None, mal_end=None):
     mal_benign_labels = np.zeros(n_packets)
     mal_benign_labels[mal_start:mal_end] = 1
     return mal_benign_labels
-
-
-def compress(zipfilename, filename):
-    zipObj = ZipFile(zipfilename, 'w', compression=ZIP_DEFLATED)
-    zipObj.write(filename)
-    zipObj.close()
-
-def decompress(zipfilename, outfolder):
-    zipObj = ZipFile(zipfilename)
-    zipObj.extractall(outfolder)
-    zipObj.close()
-
-def file_in_parts(training_set_file, testing_set_file):
-    for file in [training_set_file, testing_set_file]:
-        data = pd.read_csv(file)
-        split = len(data) // 2
-        file = str(file)
-        data[:split].to_csv(file + "_1")
-        data[split:].to_csv(file + "_2")
-        compress(file.replace(".csv", "1.zip"), file + "_1")
-        compress(file.replace(".csv", "2.zip"), file + "_2")
-
-
-
-
-if __name__ == "__main__":
-    file_in_parts()
