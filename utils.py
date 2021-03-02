@@ -111,8 +111,7 @@ def parse_df_for_pcap_validity(df, original_data, columns):
     # 2. Dependent variables - can't set TCP flags on a PING
 
     # TCP off = no TCP attributes should be set
-    if "IP__proto_6.0" in df.columns.values:
-        df.loc[original_data["IP__proto_6.0"] == 0, [col for col in df.columns.values if "TCP__" in col]] = 0
+    df.loc[original_data["IP__proto_6.0"] == 0, [col for col in df.columns.values if "TCP__" in col]] = 0
 
     # 3. Only positive values allowed
     df[df.columns.values] = df[df.columns.values].clip(lower=0)
@@ -141,7 +140,7 @@ def compare_data(real, adversarial, columns):
 
 
 def get_label_array(pcap_file, mal_start=None, mal_end=None):
-    if attacker_test_set == "datasets/eth2dump-pingFloodDDoS1m-0,5h_1.pcap":
+    if pcap_file == "datasets/eth2dump-pingFloodDDoS1m-0,5h_1.pcap":
         mal_start, mal_end = 2933, 15636
     n_packets = 0
     for pkt in RawPcapReader(pcap_file):

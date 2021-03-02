@@ -26,9 +26,9 @@ eps = np.finfo('float64').eps
 # unzip any models that need it
 for item in model_folder.iterdir():
     if item.suffix == ".zip":
-        if not (model_folder/item.name).exists():
+        if not (model_folder/item.stem).exists():
                 z = ZipFile(item)
-                z.extractall(model_folder/item.name)
+                z.extractall(model_folder)
                 z.close()
 
 class Model():
@@ -65,15 +65,27 @@ class Model():
         mal_rows = np.random.choice(mal_rows, size=min_class, replace=False)
         return data[data.index.isin(ben_rows) | data.index.isin(mal_rows)]
 
-    def prep_data(self, data, train=False):
-        if not self.anomaly and train:
-            data = self.balance_data(data)
+    def prep_data(self, data, train=False, malicious=None):
+        if type(data) is tuple:
+            x, labels = data
         else:
-            for f in self.features:
-                if not(f in data.columns.values):
-                    data[f] = 0
-        x = data[self.features].values
-        labels = data["malicious"].values.astype(int)
+            if (type(data) is str) and (".pcap" in data):
+                assert malicious is not None, ("Must provide malicious labels (int or iterable) if using pcap, not None")
+                data = self.parse_pcap(data)
+                data["malicious"] = malicious
+            elif type(data) is np.ndarray:
+                data = pd.DataFrame(data, columns=self.features)
+            if not ("malicious" in data.columns.values):
+                data["malicious"] = 1
+
+            if not self.anomaly and train:
+                data = self.balance_data(data)
+            else:
+                for f in self.features:
+                    if not(f in data.columns.values):
+                        data[f] = 0
+            x = data[self.features].values
+            labels = data["malicious"].values.astype(int)
         assert len(x) == len(labels)
         return x, labels
 
@@ -88,25 +100,14 @@ class Model():
 
     def train(self, data, verbose=True, continue_training=False):
         if (not self.save_model_path.exists()) or continue_training:
-            x, labels = self.prep_data(data, train=True)
+            x, labels = self.prep_data(data, train=(True and not(continue_training)))
             self.fit_model(x, labels)
             if not(self.save_model_path is None):
                 self.save_model()
         self.test(data, dataset_name="Training", verbose=verbose)
 
     def test(self, data, verbose=True, dataset_name="Testing", malicious=None, return_x_y_preds=False):
-        if type(data) is tuple:
-            x, labels = data
-        else:
-            if (type(data) is str) and (".pcap" in data):
-                assert malicious is not None, ("Must provide malicious labels (int or iterable) if using pcap, not None")
-                data = self.parse_pcap(data)
-                data["malicious"] = malicious
-            elif type(data) is np.ndarray:
-                data = pd.DataFrame(data, columns=self.features)
-            if not ("malicious" in data.columns.values):
-                data["malicious"] = 1
-            x, labels = self.prep_data(data)
+        x, labels = self.prep_data(data, malicious=malicious)
 
         predictions = self.get_predictions(x)
         predictions = predictions.round()
@@ -183,17 +184,7 @@ class BlackBoxModel(Model):
 
     def test(self, data):
         try:
-            if type(data) is tuple:
-                x, labels = data
-            else:
-                if (type(data) is str) and (".pcap" in data):
-                    data = self.parse_pcap(data)
-                elif type(data) is np.ndarray:
-                    data = pd.DataFrame(data, columns=self.features)
-                if not("malicious" in data.columns.values):
-                    data["malicious"] = 1
-                x, labels = self.prep_data(data)
-
+            x, labels = self.prep_data(data, malicious=1)
             predictions = self.get_predictions(x)
             predictions = predictions.round()
             total_detect = predictions.sum()
