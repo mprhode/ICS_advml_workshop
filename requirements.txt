@@ -1,10 +1,12 @@
-requests
-notebook
-tqdm
-setuptools_rust
-scapy[basic] --pre
-sklearn
-py7zr
-matplotlib
-PyYAML
-adversarial-robustness-toolbox
+requests==2.25.1
+ipywidgets==7.6.3
+notebook==6.2.0
+tqdm==4.56.2
+setuptools-rust==0.11.6
+scapy[basic]==2.4.4 --pre
+scikit-learn==0.23.2
+py7zr==0.13.0
+matplotlib==3.3.4
+PyYAML==5.4.1
+llvmlite==0.35.0
+adversarial-robustness-toolbox==1.5.2

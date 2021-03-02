@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 import matplotlib.pyplot as plt
 from zipfile import ZipFile
+import pandas as pd
 
 from utils import classification_cols, df_handle_categorical, ignore
 from download_data import pcap_to_df
@@ -31,15 +32,17 @@ for item in model_folder.iterdir():
                 z.close()
 
 class Model():
-    def __init__(self, features, save_model_name=None):
+    def __init__(self, features, save_model_name=None, verbose=True):
         self.save_model_path = None if save_model_name is None else model_folder / save_model_name
         self.model_exists = False if save_model_name is None else self.save_model_path.exists()
 
         if self.model_exists:
-            print("save_model_path exists, loading model and config....")
+            if verbose:
+                print("save_model_path exists, loading model and config....")
             self.load_model()
-            print(self.call_model)
-            print(self.features)
+            if verbose:
+                print(self.call_model)
+                print(self.features)
         else:
             self.features = [f for f in features if not (f in classification_cols + ignore)]
             self.config = {
@@ -95,10 +98,14 @@ class Model():
         if type(data) is tuple:
             x, labels = data
         else:
-            if type(data) is str and ".pcap" in data:
-                assert malicious is not None, ("Must provide malicious labels if using pcap, not None")
+            if (type(data) is str) and (".pcap" in data):
+                assert malicious is not None, ("Must provide malicious labels (int or iterable) if using pcap, not None")
                 data = self.parse_pcap(data)
                 data["malicious"] = malicious
+            elif type(data) is np.ndarray:
+                data = pd.DataFrame(data, columns=self.features)
+            if not ("malicious" in data.columns.values):
+                data["malicious"] = 1
             x, labels = self.prep_data(data)
 
         predictions = self.get_predictions(x)
@@ -154,9 +161,8 @@ class Model():
 
 
 class BlackBoxModel(Model):
-    def __init__(self, save_model_name=None):
-        super(BlackBoxModel, self).__init__(None, save_model_name=save_model_name)
-        print(self.config)
+    def __init__(self, save_model_name=None, verbose=False):
+        super(BlackBoxModel, self).__init__(None, save_model_name=save_model_name, verbose=verbose)
         self.__features = [f for f in self.features]
         self.features = None
 
@@ -180,8 +186,11 @@ class BlackBoxModel(Model):
             if type(data) is tuple:
                 x, labels = data
             else:
-                if type(data) is str and ".pcap" in data:
+                if (type(data) is str) and (".pcap" in data):
                     data = self.parse_pcap(data)
+                elif type(data) is np.ndarray:
+                    data = pd.DataFrame(data, columns=self.features)
+                if not("malicious" in data.columns.values):
                     data["malicious"] = 1
                 x, labels = self.prep_data(data)
 
@@ -347,13 +356,12 @@ if __name__ == "__main__":
     train_data = get_training_data(nrows=None)
 
     features = [c for c in train_data.columns.values if not(c in classification_cols)]
-    print(features)
 
     contamination = train_data["malicious"].sum() / len(train_data)
     test_data = get_testing_data(nrows=None)
     AD_models = [LOF, ISOF, OneClassSVM]
 
-    print(contamination)
+    print("contamination ratio", contamination)
 
     # time model
     for model_name, mc in [("dt", DecisionTree), ("MLP", MLP), ("rf", RandomForest), ("ISOF", ISOF), ("svm", SVM),

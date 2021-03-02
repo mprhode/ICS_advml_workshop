@@ -109,26 +109,29 @@ def parse_df_for_pcap_validity(df, original_data, columns):
         #     pass
 
     # 2. Dependent variables - can't set TCP flags on a PING
-    print(df.columns.values)
-    print(original_data.columns.values)
+
     # TCP off = no TCP attributes should be set
-    df.loc[original_data["IP__proto_6.0"] == 0, [col for col in df.columns.values if "TCP__" in col]] = 0
+    if "IP__proto_6.0" in df.columns.values:
+        df.loc[original_data["IP__proto_6.0"] == 0, [col for col in df.columns.values if "TCP__" in col]] = 0
 
     # 3. Only positive values allowed
-    df = df.clip(0, None)
+    df[df.columns.values] = df[df.columns.values].clip(lower=0)
 
     # 4. Some can only be integers e.g. len
-    df["IP__len"] = df["IP__len"].round()
-    df["IP__ttl"] = df["IP__ttl"].round().clip(0, 225)
+    if "IP__len" in df.columns.values:
+        df["IP__len"] = df["IP__len"].round()
+    if "IP__ttl" in df.columns.values:
+        df["IP__ttl"] = df["IP__ttl"].round().clip(0, 225)
 
     # 5. max values on some features
-
-    return df
+    return df.values
 
 
 def compare_data(real, adversarial, columns):
     # prints differences in packets only
-    not_matching = np.not_equal(real, adversarial)
+    real = real.values if type(real) is pd.DataFrame else real
+    adversarial = adversarial.values if type(adversarial) is pd.DataFrame else adversarial
+    not_matching = np.not_equal(real.astype(float), adversarial.astype(float))
     real_no_match = real[not_matching]
     adv_no_match = adversarial[not_matching]
     columns = [c for c, m in zip(columns, not_matching) if m]
