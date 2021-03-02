@@ -9,9 +9,9 @@ The data used here is a subset of a dataset collected by researchers at The Univ
 
 ## Installation and Preparation
 Pre-requisites:
-Python3 
+Python3 and <b> about 3GB (or more) of storage </b>
 
-Unix instructions:
+Open a command line terminal 
 
 1. Clone repo
 
@@ -20,11 +20,14 @@ Unix instructions:
     cd ICS_advml_workshop
     ```
 
-2. We recommend using a virtual environment for these workbooks
+2. We recommend using a virtual environment for these workbooks 
+
+   For Mac/Linux with pip:
 
    ```
    python3 -m venv myvenv
    source myvenv/bin/activate
    pip install -r requirements.txt
    python download_data.py
-   ```
+   ```    
+   
