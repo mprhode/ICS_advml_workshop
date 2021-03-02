@@ -15,6 +15,7 @@ import requests
 import zipfile
 from tqdm import tqdm
 from pathlib import Path
+import os
 
 data_dir = Path("datasets")
 
@@ -188,11 +189,13 @@ def decompress(zipfilename, outfolder):
     zipObj.close()
 
 def reconstitute_data(training_set_file, testing_set_file):
-    for file in [training_set_file, testing_set_file]:
+    for file in tqdm([training_set_file, testing_set_file]):
         file = str(file)
         decompress(file.replace(".csv", "1.zip"), ".")
         decompress(file.replace(".csv", "2.zip"), ".")
         pd.concat([pd.read_csv(file + "_1"), pd.read_csv(file + "_2")]).to_csv(file, index=False)
+        os.remove(file + "_1")
+        os.remove(file + "_2")
 
 
 def file_in_parts(training_set_file, testing_set_file):
@@ -215,3 +218,4 @@ if __name__ == "__main__":
         #     lambda x: data_dir / x["folder"] / x["attack"] / x["filename"], axis=1)
         # labels["relevant_files_exists"] = labels["relevant_files"].apply(lambda x: x.exists())
         # download_and_label_data(labels, data_dir)
+    from models import modelB

@@ -211,8 +211,8 @@ class BlackBoxModel(Model):
         return "No model data"
 
 
-modelB = BlackBoxModel(save_model_name="modelB")
-modelC = BlackBoxModel(save_model_name="modelC")
+modelA = BlackBoxModel(save_model_name="modelB")
+modelB = BlackBoxModel(save_model_name="modelC")
 
 class AnomalyModel(Model):
     def __init__(self, features, contamination=None, save_model_name=None):
